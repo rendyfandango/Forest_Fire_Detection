@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Pendeteksi Kebakaran IoT - Kelompok 6</title>
+    
+    <!-- Google Fonts: Outfit & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- CSS File -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    
+    <!-- Supabase JS Client SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- Socket.IO Client JS -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    
+    <!-- Lucide Icons for Clean Modern Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+    <!-- BACKGROUND EFFECTS -->
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+
+    <!-- NOTIFICATION TOAST -->
+    <div id="toast" class="toast hidden">
+        <div class="toast-content">
+            <i data-lucide="info" class="toast-icon"></i>
+            <span id="toast-message">Notifikasi</span>
+        </div>
+    </div>
+
+    <!-- ================= AUTHENTICATION CONTAINER ================= -->
+    <div id="auth-container" class="auth-wrapper">
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="logo-wrapper">
+                    <i data-lucide="flame" class="logo-icon animate-pulse"></i>
+                </div>
+                <h1>Detektor Kebakaran IoT</h1>
+                <p>Sistem Monitoring & Kontrol Aktuator - Kelompok 6</p>
+            </div>
+            
+            <!-- Form Login -->
+            <form id="login-form" class="auth-form">
+                <div class="input-group">
+                    <label for="login-email">Alamat Email</label>
+                    <div class="input-wrapper">
+                        <i data-lucide="mail" class="input-icon"></i>
+                        <input type="email" id="login-email" placeholder="nama@email.com" required autocomplete="username">
+                    </div>
+                </div>
+                
+                <div class="input-group">
+                    <label for="login-password">Kata Sandi</label>
+                    <div class="input-wrapper">
+                        <i data-lucide="lock" class="input-icon"></i>
+                        <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password">
+                    </div>
+                </div>
+                
+                <button type="submit" id="btn-login" class="btn-primary">
+                    <span>Masuk ke Dashboard</span>
+                    <i data-lucide="arrow-right"></i>
+                </button>
+                <p class="auth-toggle">Belum punya akun? <a href="#" id="toggle-to-register">Daftar Sekarang</a></p>
+            </form>
+
+            <!-- Form Register -->
+            <form id="register-form" class="auth-form hidden">
+                <div class="input-group">
+                    <label for="register-email">Alamat Email Baru</label>
+                    <div class="input-wrapper">
+                        <i data-lucide="mail" class="input-icon"></i>
+                        <input type="email" id="register-email" placeholder="nama@email.com" required autocomplete="username">
+                    </div>
+                </div>
+                
+                <div class="input-group">
+                    <label for="register-password">Kata Sandi Baru</label>
+                    <div class="input-wrapper">
+                        <i data-lucide="lock" class="input-icon"></i>
+                        <input type="password" id="register-password" placeholder="Minimal 6 karakter" required autocomplete="new-password">
+                    </div>
+                </div>
+                
+                <button type="submit" id="btn-register" class="btn-primary">
+                    <span>Daftar Akun Baru</span>
+                    <i data-lucide="user-plus"></i>
+                </button>
+                <p class="auth-toggle">Sudah punya akun? <a href="#" id="toggle-to-login">Masuk di sini</a></p>
+            </form>
+
+            <div id="auth-error" class="error-box hidden">
+                <i data-lucide="alert-triangle"></i>
+                <span id="error-message">Gagal melakukan login.</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= MAIN DASHBOARD CONTAINER ================= -->
+    <div id="dashboard-container" class="dashboard-wrapper hidden">
+        
+        <!-- HEADER -->
+        <header class="dashboard-header">
+            <div class="header-brand">
+                <div class="brand-icon">
+                    <i data-lucide="shield-alert" class="icon-brand"></i>
+                </div>
+                <div>
+                    <h2>IoT Fire Detector</h2>
+                    <p>Dashboard Monitoring & Kontrol Aktuator (Kelompok 6)</p>
+                </div>
+            </div>
+            
+            <div class="header-actions">
+                <!-- User Profile & Session -->
+                <div class="user-profile">
+                    <i data-lucide="user" class="profile-icon"></i>
+                    <span id="user-email" class="profile-email">user@email.com</span>
+                </div>
+                <!-- Logout Button -->
+                <button id="btn-logout" class="btn-secondary">
+                    <i data-lucide="log-out"></i>
+                    <span>Keluar</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- STATUS BAR (CONNECTION INDICATORS) -->
+        <div class="status-bar">
+            <div class="status-indicator">
+                <span class="status-label">Server Flask Bridge:</span>
+                <span id="status-flask" class="badge badge-error">
+                    <span class="badge-dot"></span>
+                    <span class="badge-text">Terputus</span>
+                </span>
+            </div>
+            <div class="status-indicator">
+                <span class="status-label">MQTT HiveMQ Broker:</span>
+                <span id="status-mqtt" class="badge badge-error">
+                    <span class="badge-dot"></span>
+                    <span class="badge-text">Terputus</span>
+                </span>
+            </div>
+            <div class="status-indicator">
+                <span class="status-label">Supabase Database:</span>
+                <span id="status-supabase" class="badge badge-success">
+                    <span class="badge-dot"></span>
+                    <span class="badge-text">Terhubung</span>
+                </span>
+            </div>
+        </div>
+
+        <!-- MAIN LAYOUT GRID -->
+        <main class="dashboard-grid">
+            
+            <!-- 1. TELEMETRY MONITORING SECTION -->
+            <section class="grid-span-full">
+                <h3 class="section-title"><i data-lucide="activity"></i> Pemantauan Sensor Real-time</h3>
+                
+                <div class="telemetry-widgets">
+                    
+                    <!-- widget 1: suhu -->
+                    <div class="widget-card" id="card-suhu">
+                        <div class="widget-icon-wrapper temp-theme">
+                            <i data-lucide="thermometer"></i>
+                        </div>
+                        <div class="widget-info">
+                            <span class="widget-label">Suhu Sensor</span>
+                            <div class="widget-value-wrapper">
+                                <span id="val-suhu" class="widget-value">--.-</span>
+                                <span class="widget-unit">°C</span>
+                            </div>
+                            <span id="lbl-suhu" class="widget-status status-safe">Membaca data...</span>
+                        </div>
+                    </div>
+
+                    <!-- widget 2: status api -->
+                    <div class="widget-card" id="card-api">
+                        <div class="widget-icon-wrapper flame-theme">
+                            <i data-lucide="flame"></i>
+                        </div>
+                        <div class="widget-info">
+                            <span class="widget-label">Sensor Api (Flame)</span>
+                            <span id="val-api" class="widget-value-text status-safe">--</span>
+                            <span id="lbl-api" class="widget-status status-safe">Membaca data...</span>
+                        </div>
+                    </div>
+
+                    <!-- widget 3: status asap -->
+                    <div class="widget-card" id="card-asap">
+                        <div class="widget-icon-wrapper smoke-theme">
+                            <i data-lucide="wind"></i>
+                        </div>
+                        <div class="widget-info">
+                            <span class="widget-label">Sensor Asap (Smoke)</span>
+                            <span id="val-asap" class="widget-value-text status-safe">--</span>
+                            <span id="lbl-asap" class="widget-status status-safe">Membaca data...</span>
+                        </div>
+                    </div>
+
+                    <!-- widget 4: status sistem (edge decision) -->
+                    <div class="widget-card system-card-idle" id="card-sistem">
+                        <div class="widget-info full-width">
+                            <span class="widget-label text-center">Status Sistem (Edge Decision)</span>
+                            <div id="val-sistem" class="system-status-display">MENUNGGU</div>
+                            <div id="lbl-sistem" class="system-status-subtitle">Menghubungkan ke telemetry...</div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- 2. MANUAL CONTROL SECTION -->
+            <section class="grid-column">
+                <h3 class="section-title"><i data-lucide="sliders"></i> Kontrol Manual Aktuator</h3>
+                
+                <div class="controls-container">
+                    
+                    <!-- control card 1: buzzer -->
+                    <div class="control-card">
+                        <div class="control-card-header">
+                            <div class="control-title-wrapper">
+                                <i data-lucide="volume2" class="control-icon buzzer-icon"></i>
+                                <div>
+                                    <h4>Alarm Buzzer</h4>
+                                    <p>Nyalakan/matikan sirine hardware</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="control-card-body">
+                            <div class="btn-group">
+                                <button id="btn-buzzer-on" class="btn-control btn-on" onclick="publishBuzzer('ON')">
+                                    <i data-lucide="play"></i>
+                                    <span>ON</span>
+                                </button>
+                                <button id="btn-buzzer-off" class="btn-control btn-off active" onclick="publishBuzzer('OFF')">
+                                    <i data-lucide="square"></i>
+                                    <span>OFF</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- control card 2: led status indicator -->
+                    <div class="control-card">
+                        <div class="control-card-header">
+                            <div class="control-title-wrapper">
+                                <i data-lucide="lightbulb" class="control-icon led-icon"></i>
+                                <div>
+                                    <h4>Status Lampu LED Fisik</h4>
+                                    <p>Menampilkan LED aktif pada hardware ESP32</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="control-card-body">
+                            <div class="led-status-grid">
+                                <div id="indicator-led-green" class="led-indicator-item active-green">
+                                    <span class="led-dot color-green"></span>
+                                    <span>Hijau (Normal)</span>
+                                </div>
+                                <div id="indicator-led-yellow" class="led-indicator-item">
+                                    <span class="led-dot color-yellow"></span>
+                                    <span>Kuning (Siaga)</span>
+                                </div>
+                                <div id="indicator-led-red" class="led-indicator-item">
+                                    <span class="led-dot color-red"></span>
+                                    <span>Merah (Bahaya)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- 3. HISTORICAL DATA SECTION -->
+            <section class="grid-column grid-span-2">
+                <div class="section-header-row">
+                    <h3 class="section-title"><i data-lucide="database"></i> Tabel Data Historis</h3>
+                    <div class="table-actions">
+                        <button id="btn-refresh-history" class="btn-action-small">
+                            <i data-lucide="refresh-cw" id="icon-refresh"></i>
+                            <span>Segarkan</span>
+                        </button>
+                        <button id="btn-download-csv" class="btn-primary-small">
+                            <i data-lucide="download"></i>
+                            <span>Unduh CSV</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-wrapper">
+                    <table id="logs-table">
+                        <thead>
+                            <tr>
+                                <th>Waktu Kejadian</th>
+                                <th>Suhu (°C)</th>
+                                <th>Sensor Api</th>
+                                <th>Sensor Asap</th>
+                                <th>Status Sistem</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-table-body">
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">Sedang mengambil data historis...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- JavaScript File -->
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

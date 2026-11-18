@@ -1,0 +1,8 @@
+Flask>=3.0.0
+flask-socketio>=5.3.6
+paho-mqtt>=1.6.1
+python-dotenv>=1.0.0
+simple-websocket>=1.0.0
+pyserial>=3.5
+supabase>=2.3.0
+postgrest>=0.10.0
